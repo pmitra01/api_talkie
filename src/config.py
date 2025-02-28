@@ -13,7 +13,17 @@ class PostgresConfig:
     # todo: find different place to register access tables, instead of bloating the login PostgresConfig
 
 
-DEFAULT_POSTGRES_CONFIG_LOCAL = PostgresConfig(
+DEFAULT_POSTGRES_CONFIG_SUPABASE = PostgresConfig(
+     username = 'postgres',
+     password = 'postgres',
+     host = 'localhost',
+     port = '5432',
+     database = 'postgres',
+     table_name = 'nutrition_data'
+ )
+
+
+DEFAULT_POSTGRES_CONFIG_LOCAL_v1 = PostgresConfig(
      username = 'postgres',
      password = 'postgres',
      host = 'localhost',

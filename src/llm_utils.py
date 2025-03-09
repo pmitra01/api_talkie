@@ -12,6 +12,7 @@ from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, BaseLLMOutputParser
 from langchain_core.prompt_values import PromptValue
 from langchain.globals import set_llm_cache
+from src.config import GOOGLE_API_KEY, OPEN_AI_KEY
 # from langchain.cache import InMemoryCache
 from langchain_community.cache import InMemoryCache
 
@@ -25,13 +26,10 @@ class ModelId(LowercaseStrEnum):
     GEMINI_1_5_FLASH_8B = "gemini-1.5-flash-8b"
     GEMINI_2_0_FLASH = "gemini-2.0-flash"
 
-# load API keys
-load_dotenv()
-GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
-OPEN_AI_KEY = os.environ["OPEN_AI_KEY"]
-
 DEFAULT_MODEL = ModelId.GEMINI_1_5_FLASH
 
+
+# load API keys
 NUTRI_PROMPT_TEMPLATE_STRING = ("You are a search assistant. The human user will give you a description of their meals, portion size and the time they consumed it. Your task is to analyse the meals, log the date and time of each meal,"
     "and then decompose the meal and its ingredients into their nutrient content. Use google search tool to get nutrient data from https://www.fatsecret.com/calories-nutrition/ if possible. MAke sensible guesses about portions where user does not provide"
     "Output the amount of carbohydrates, fats, proteins in grams, and calories in integer without making unit explicit"
@@ -119,12 +117,3 @@ def prompt_llm_for_response(user_input_meal_description_string: str,
     print(f"Execution time duration: {end_time - start_time} ")
     parsed_json = parser.parse(response.content)
     return parsed_json
-
-
-
-
-
-
-
-
-

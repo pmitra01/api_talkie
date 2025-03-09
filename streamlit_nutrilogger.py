@@ -136,7 +136,7 @@ def write_to_postgres(df: pd.DataFrame,
 
     elif postgres_host == POSTGRES_HOST_SUPABASE:
         json_records = df.to_dict(orient = "records")
-        #insert_data_in_supabase(json_records=json_records,
+        # insert_data_in_supabase(json_records=json_records,
         #                        table_name=postgres_config.table_name,
         #                        conn=conn)
         conn.table(postgres_config.table_name).insert(json_records).execute()
@@ -189,58 +189,66 @@ with tab1:
             log_df = process_df_for_writing_to_sql_db(log_df)
             st.write("### Nutrition Information:")
             st.dataframe(log_df)
-            # log_df.to_csv("data/nutrition_data.csv", index=False)
-
-            if st.button("Yes, correct. Add to database."):
-                write_to_postgres(log_df,
-                                  conn=supabase_conn,
-                                  postgres_host=STREAMLIT_APP_POSTGRESS_HOST,
-                                  postgres_config=STREAMLIT_APP_POSTGRES_CONFIG)
-                st.write("Data added to database.")
-
-            if st.button("No, incorrect. Reset"):
-                clear_text_area()
-                st.write("Reset complete. Enter your meal description again.")
         else:
             st.warning("Please enter a meal description.")
 
+        if st.button("Yes, correct. Add to database."):
+            write_to_postgres(log_df,
+                                conn=supabase_conn,
+                                postgres_host=STREAMLIT_APP_POSTGRESS_HOST,
+                                postgres_config=STREAMLIT_APP_POSTGRES_CONFIG)
+            st.write("Data added to database.")
+
+        if st.button("No, incorrect. Reset"):
+            clear_text_area()
+            st.write("Reset complete. Enter your meal description again.")
 
 
 with tab2:
     # Plotting function
     st.subheader("View Nutrition Trends")
 
-    if st.button("View trends"):
-        df = read_table_from_postgres(host = STREAMLIT_APP_POSTGRESS_HOST,
-                                      postgres_config = STREAMLIT_APP_POSTGRES_CONFIG)
+    def display_nutrition_trends(config):
+        """Display nutrition trends visualization dashboard"""
+        df = read_table_from_postgres(
+            host=config.postgres_host,
+            postgres_config=config.postgres_config
+        )
         df = process_df_for_analysis(df)
+        return df
 
+    def create_date_filter(df):
+        """Create and return date filter controls"""
         st.subheader('Meal Nutrition Logs')
-        # Date slider
+        start_date, end_date = st.slider(
+            'Select date range',
+            min_value=df[COLUMN_NAMES.DATE].min(),
+            max_value=df[COLUMN_NAMES.DATE].max() + datetime.timedelta(days=1),
+            value=(df[COLUMN_NAMES.DATE].min(), df[COLUMN_NAMES.DATE].max())
+        )
+        return df[(df[COLUMN_NAMES.DATE] >= start_date) & (df[COLUMN_NAMES.DATE] <= end_date)]
 
-        start_date, end_date = st.slider('Select date range',
-                                         min_value=df[COLUMN_NAMES.DATE].min(),
-                                         max_value=df[COLUMN_NAMES.DATE].max() + datetime.timedelta(days=1),
-                                         value=(df[COLUMN_NAMES.DATE].min(), df[COLUMN_NAMES.DATE].max()))
-
-        # Filter DataFrame based on date range
-        filtered_df = df[(df[COLUMN_NAMES.DATE] >= start_date) & (df[COLUMN_NAMES.DATE] <= end_date)]
-
-        # Create a 2x2 grid layout
+    def display_nutrition_plots(filtered_df):
+        """Display nutrition plots in a grid layout"""
+        nutrients = ['protein', 'fat', 'carbohydrates', 'calories']
         col1, col2 = st.columns(2)
         col3, col4 = st.columns(2)
+        cols = [col1, col2, col3, col4]
 
-        with col1:
-            st.pyplot(plot_nutrition(filtered_df, 'protein'))
+        for col, nutrient in zip(cols, nutrients):
+            with col:
+                st.pyplot(plot_nutrition(filtered_df, nutrient))
 
-        with col2:
-            st.pyplot(plot_nutrition(filtered_df, 'fat'))
+    if st.button("View trends"):
+        config = {
+            'postgres_host': STREAMLIT_APP_POSTGRESS_HOST,
+            'postgres_config': STREAMLIT_APP_POSTGRES_CONFIG
+        }
+        config = type('Config', (), config)  # Convert dict to object
 
-        with col3:
-            st.pyplot(plot_nutrition(filtered_df, 'carbohydrates'))
-
-        with col4:
-            st.pyplot(plot_nutrition(filtered_df, 'calories'))
-
+        df = display_nutrition_trends(config)
+        filtered_df = create_date_filter(df)
+        display_nutrition_plots(filtered_df)
+        
         # Display the filtered DataFrame
         st.write('Filtered DataFrame:', filtered_df)

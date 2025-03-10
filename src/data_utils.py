@@ -63,6 +63,7 @@ def validate_dataframe(df: pd.DataFrame):
     return validated_records
 """
 
+
 def process_df_for_writing_to_sql_db(df:pd.DataFrame):
     df[COLUMN_NAMES.DATE] = pd.to_datetime(df[COLUMN_NAMES.DATE], format="%Y-%m-%d")
     df[COLUMN_NAMES.DATE] = df[COLUMN_NAMES.DATE].dt.date

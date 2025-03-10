@@ -8,11 +8,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from Home import supabase_conn, STREAMLIT_APP_POSTGRESS_HOST, STREAMLIT_APP_POSTGRES_CONFIG
 from src.data_utils import process_df_for_analysis, COLUMN_NAMES
-from src.config import DEFAULT_POSTGRES_CONFIG_LOCAL_v1, PostgresConfig
+from src.config import DEFAULT_POSTGRES_CONFIG_LOCAL_v1, PostgresConfig, DEFAULT_NUTRIENT_BASELINE
 from Home import POSTGRES_TABLENAME, POSTGRES_HOST_LOCAL, POSTGRES_HOST_SUPABASE, ALLOWED_POSTGRES_HOSTS
-# todo: you should be able to change between dofferent dashboard views, without losing all teh data each time
-# todo: add a trend of expected vs actual (average) calories/protein/carbs/fat per day 
-# can you share the supabase connectuon between the pages? OR should it be seaparte?
 
 
 # Initialize session state for both buttons if not already set
@@ -72,6 +69,13 @@ def slice_df_by_date_range(df, start_date, end_date):
 
 def plot_nutrition(df_, selected_nutrients, start_date, end_date):
     """Plot nutrition trends for selected nutrients with fixed date range"""
+    # Get baseline values for Female 27-40 from config
+    baseline_values = {
+        'protein': DEFAULT_NUTRIENT_BASELINE['nutrients'][0]['per_meal']['protein_g'],
+        'fat': DEFAULT_NUTRIENT_BASELINE['nutrients'][0]['per_meal']['fat_g'], 
+        'carbohydrates': DEFAULT_NUTRIENT_BASELINE['nutrients'][0]['per_meal']['carbohydrates_g'],
+        'calories': DEFAULT_NUTRIENT_BASELINE['nutrients'][0]['per_meal']['calories_kcal']
+    }
 
     # df_, start_date, end_date = date_window_selector(df_, time_range)
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -88,8 +92,14 @@ def plot_nutrition(df_, selected_nutrients, start_date, end_date):
         complete_df['date'] = pd.to_datetime(complete_df['date'])
         filtered_df_ = pd.merge(complete_df, filtered_df_, how='left', left_on='date', right_on='date')
         filtered_df_[nutrient] = filtered_df_[nutrient].fillna(0)
+        # Plot actual nutrient values
+        ax.plot(filtered_df_['date'], filtered_df_[nutrient], marker='o', label=f'Actual {nutrient.capitalize()}')
         
-        ax.plot(filtered_df_['date'], filtered_df_[nutrient], marker='o', label=nutrient.capitalize())
+        # Plot baseline as shaded line
+        baseline = baseline_values[nutrient]
+        ax.axhline(y=baseline, color='gray', alpha=0.3, linestyle='--', 
+                  label=f'Target {nutrient.capitalize()} ({baseline})')
+        ax.fill_between(filtered_df_['date'], baseline, alpha=0.1, color='gray')
     
     ax.set_xlabel('Date')
     ax.set_ylabel('Amount')

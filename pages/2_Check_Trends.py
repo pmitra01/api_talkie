@@ -6,42 +6,13 @@ import streamlit as st
 import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
-from Home import init_connection, STREAMLIT_APP_POSTGRESS_HOST, STREAMLIT_APP_POSTGRES_CONFIG, supabase_conn
+from Home import supabase_conn, STREAMLIT_APP_POSTGRESS_HOST, STREAMLIT_APP_POSTGRES_CONFIG
 from src.data_utils import process_df_for_analysis, COLUMN_NAMES
 from src.config import DEFAULT_POSTGRES_CONFIG_LOCAL_v1, PostgresConfig
 from Home import POSTGRES_TABLENAME, POSTGRES_HOST_LOCAL, POSTGRES_HOST_SUPABASE, ALLOWED_POSTGRES_HOSTS
 # todo: you should be able to change between dofferent dashboard views, without losing all teh data each time
 # todo: add a trend of expected vs actual (average) calories/protein/carbs/fat per day 
 # can you share the supabase connectuon between the pages? OR should it be seaparte?
-
-# Initialize connection
-# supabase_conn = init_connection()
-
-def display_nutrition_trends(postgres_host, postgres_config):
-    """Display nutrition trends visualization dashboard"""
-    df = read_table_from_postgres(
-        host = postgres_host,
-        postgres_config = postgres_config
-    )
-    df = process_df_for_analysis(df)
-    return df
-
-
-def plot_nutrition_old(df_, selected_nutrients):
-    """Plot nutrition trends for selected nutrients"""
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    for nutrient in selected_nutrients:
-        filtered_df_ = df_.groupby('date')[nutrient].mean().reset_index()
-        ax.plot(filtered_df_['date'], filtered_df_[nutrient], marker='o', label=nutrient.capitalize())
-    
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Amount')
-    ax.set_title('Nutrient Intake Over Time')
-    ax.grid(True)
-    ax.legend()
-    return fig
-
 
 
 # Initialize session state for both buttons if not already set
@@ -55,51 +26,58 @@ if "nutri_data" not in st.session_state:
     st.session_state.nutri_data = pd.DataFrame()
 
 
-def create_date_filter(df):
+def display_nutrition_trends(postgres_host, postgres_config):
+    """Display nutrition trends visualization dashboard"""
+    df = read_table_from_postgres(
+        host = postgres_host,
+        postgres_config = postgres_config
+    )
+    df = process_df_for_analysis(df)
+    return df
+
+
+def create_date_slider(df):
     """Create and return date filter controls"""
     st.subheader('Meal Nutrition Logs')
 
-    st.session_state.start_date, st.session_state.end_date = st.slider(
+    start_date, end_date = st.sidebar.slider(
             'Select custom date range',
             min_value=df[COLUMN_NAMES.DATE].min(),
             max_value=df[COLUMN_NAMES.DATE].max() + datetime.timedelta(days=1),
             value=(df[COLUMN_NAMES.DATE].min(), df[COLUMN_NAMES.DATE].max())
         )
     
+    return start_date, end_date
     # end_date = datetime.datetime.now().date()
-    return df[(df[COLUMN_NAMES.DATE] >= st.session_state.view_start_date) & (df[COLUMN_NAMES.DATE] <= st.session_state.end_date)], st.session_state.view_start_date, st.session_state.end_date
+    # return slice_df_by_date_range(df, st.session_state.view_start_date, st.session_state.end_date)
 
 
-def date_window_selector(df):
-       # Add time range selector
-    time_range = st.radio(
-        "Select time range",
-        ["1 Week", "1 Month", "3 Months", "1 Year", "Custom"],
-        index=0, # Default to 1 Week, 
-        key = "time_range"
-    )
+def date_window_selector(end_date = st.session_state.end_date, time_range = "1 Week"):
     if time_range == "1 Week":
-        st.session_state.view_start_date = st.session_state.end_date - datetime.timedelta(days=7)
+        start_date = end_date - datetime.timedelta(days=7)
     elif time_range == "1 Month":
-        st.session_state.view_start_date = st.session_state.end_date - datetime.timedelta(days=30)
+        start_date = end_date - datetime.timedelta(days=30)
     elif time_range == "3 Months":
-        st.session_state.view_start_date = st.session_state.end_date - datetime.timedelta(days=90)
+        start_date = end_date - datetime.timedelta(days=90)
     elif time_range == "1 Year":
-        st.session_state.view_start_date = st.session_state.end_date - datetime.timedelta(days=365)
+        start_date = end_date - datetime.timedelta(days=365)
     else:  # Custom
-        st.session_state.view_start_date = st.session_state.start_date
+        start_date = st.session_state.start_date
+    return start_date, end_date
 
-    return df[(df[COLUMN_NAMES.DATE] >= st.session_state.view_start_date) & (df[COLUMN_NAMES.DATE] <= st.session_state.end_date)], st.session_state.view_start_date, st.session_state.end_date
    
+def slice_df_by_date_range(df, start_date, end_date):
+    return df[(df[COLUMN_NAMES.DATE] >=start_date) & (df[COLUMN_NAMES.DATE] <= end_date)]
+
 
 def plot_nutrition(df_, selected_nutrients, start_date, end_date):
     """Plot nutrition trends for selected nutrients with fixed date range"""
 
-    df_, start_date, end_date = date_window_selector(df_)
+    # df_, start_date, end_date = date_window_selector(df_, time_range)
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # Create complete date range
-    date_range = pd.date_range(start=start_date, end=end_date, freq='D').strftime('%Y-%m-%d')
+    date_range = pd.date_range(start=st.session_state.view_start_date, end=st.session_state.end_date, freq='D').strftime('%Y-%m-%d')
     
     for nutrient in selected_nutrients:
         # Group by date and calculate mean
@@ -129,7 +107,6 @@ def plot_nutrition(df_, selected_nutrients, start_date, end_date):
     plt.tight_layout()
     
     return fig
-
 
 
 def display_nutrition_plots(filtered_df):
@@ -168,12 +145,11 @@ def read_table_from_postgres(
 def fetch_data_from_supabase(conn = supabase_conn, table_name = POSTGRES_TABLENAME):
     return conn.table(table_name).select("*").execute()
 
+########################
 #### app logic ####
+########################
 
-
-st.title("Check your trends")# Plotting function
 st.subheader("View Nutrition Trends")
-
 
 # Add nutrient selector
 available_nutrients = [COLUMN_NAMES.PROTEIN, COLUMN_NAMES.FAT, COLUMN_NAMES.CARBOHYDRATES, COLUMN_NAMES.CALORIES]
@@ -183,19 +159,29 @@ selected_nutrients = st.multiselect(
     default=[COLUMN_NAMES.PROTEIN, COLUMN_NAMES.CALORIES]
 )
 
-if st.button("View trends", key="view_trends_button"):
-    df = display_nutrition_trends(postgres_host=STREAMLIT_APP_POSTGRESS_HOST,
-                                postgres_config=STREAMLIT_APP_POSTGRES_CONFIG)
-    #    filtered_df = create_date_filter(df)
-    st.session_state.nutri_data = df
-    filtered_df, start_date, end_date = create_date_filter( st.session_state.nutri_data)
-    st.dataframe(filtered_df)
-    if selected_nutrients:
-        #st.pyplot(plot_nutrition(filtered_df, selected_nutrients))
-        st.pyplot(plot_nutrition(filtered_df, selected_nutrients, start_date, end_date))
-    else:
-        st.warning("Please select at least one nutrient to display")
-    
-    # Display the filtered DataFrame
-    st.write('Filtered DataFrame:', filtered_df)
+
+st.session_state.nutri_data = display_nutrition_trends(postgres_host=STREAMLIT_APP_POSTGRESS_HOST,
+                            postgres_config=STREAMLIT_APP_POSTGRES_CONFIG)
+
+
+st.session_state.start_date, st.session_state.end_date = create_date_slider(df = st.session_state.nutri_data)
+# df = slice_df_by_date_range(st.session_state.nutri_data, st.session_state.start_date, st.session_state.end_date)
+
+time_range = st.sidebar.radio(
+    "Select time range",
+    ["1 Week", "1 Month", "3 Months", "1 Year", "Custom"],
+    index = 0, # Default to 1 Week, 
+    key = "time_range"
+)
+
+st.session_state.view_start_date, st.session_state.end_date = date_window_selector(end_date=st.session_state.end_date, time_range=time_range)                            
+filtered_df = slice_df_by_date_range(st.session_state.nutri_data, start_date = st.session_state.view_start_date, end_date = st.session_state.end_date)
+
+if selected_nutrients:
+    st.pyplot(plot_nutrition(filtered_df, selected_nutrients, st.session_state.view_start_date, st.session_state.end_date))
+else:
+    st.warning("Please select at least one nutrient to display")
+
+# Display the filtered DataFrame
+st.write('Filtered DataFrame:', filtered_df)
 
